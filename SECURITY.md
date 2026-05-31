@@ -3,7 +3,7 @@
 ## Reporting a Vulnerability
 Please DO NOT open a public GitHub issue for security vulnerabilities.
 
-Email: security@grantstream.xyz (or your email)
+Email: security@grantstream.xyz (teeagbaji@gmail.com)
 
 We will respond within 48 hours and coordinate a fix before public disclosure.
 
