@@ -1776,6 +1776,10 @@ let connectorsApi = null;
 
 async function initWagmi() {
   try {
+    wagmiApi = await import('https://cdn.jsdelivr.net/npm/wagmi@2/+esm');
+    chainsApi = await import('https://cdn.jsdelivr.net/npm/wagmi@2/chains/+esm');
+    connectorsApi = await import('https://cdn.jsdelivr.net/npm/wagmi@2/connectors/+esm');
+    coreApi = await import('https://cdn.jsdelivr.net/npm/@wagmi/core@2/+esm');
     wagmiApi       = await import('https://cdn.jsdelivr.net/npm/wagmi@2/+esm');
     chainsApi      = await import('https://cdn.jsdelivr.net/npm/wagmi@2/chains/+esm');
     connectorsApi  = await import('https://cdn.jsdelivr.net/npm/wagmi@2/connectors/+esm');
@@ -2576,8 +2580,17 @@ function hasWalletConnection() {
 function openWalletModal() {
   if (hasWalletConnection()) {
     if (coreApi && wagmiConfig) coreApi.disconnect(wagmiConfig);
+    // Clear SIWE session state and wagmi persisted storage
+    wagmiConfig = null;
+    coreApi = null;
+    sessionStorage.clear();
+    localStorage.removeItem('wagmi.store');
+    localStorage.removeItem('wagmi.connected');
+    localStorage.removeItem('wagmi.wallet');
     updateWalletUi(null);
     toast('Wallet disconnected.', 'success');
+    // Re-initialise wagmi so a fresh connection is possible
+    initWagmi();
     return;
   }
   openModal('wallet-modal');
