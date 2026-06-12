@@ -715,7 +715,60 @@
 
   .btn-reject:hover { background: rgba(239,68,68,0.2); }
 
+  /* SPINNER */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+
+  .btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  /* TOAST — error type */
+  .toast.error { border-color: rgba(239,68,68,0.5); }
+
   /* LEADERBOARD */
+  .lb-loading {
+    text-align: center; padding: 2rem; color: var(--text3);
+    font-size: 0.85rem;
+  }
+  .lb-controls {
+    display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .lb-sort-btn {
+    background: var(--surface); border: 1px solid var(--border2);
+    color: var(--text2); border-radius: 6px; padding: 4px 12px;
+    font-size: 0.78rem; font-family: var(--sans); cursor: pointer;
+    transition: all 0.15s;
+  }
+  .lb-sort-btn.active {
+    background: rgba(74,222,128,0.12); border-color: var(--green-dim);
+    color: var(--green);
+  }
+  .lb-sort-btn:hover:not(.active) { border-color: var(--border2); color: var(--text); }
+  .lb-refresh-btn {
+    margin-left: auto; background: transparent; border: 1px solid var(--border);
+    color: var(--text3); border-radius: 6px; padding: 4px 10px;
+    font-size: 0.75rem; cursor: pointer; transition: all 0.15s;
+  }
+  .lb-refresh-btn:hover { color: var(--green); border-color: var(--green-dim); }
+  .lb-source-badge {
+    font-size: 0.7rem; color: var(--text3); padding: 2px 8px;
+    border: 1px solid var(--border); border-radius: 4px;
+  }
+  .lb-source-badge.live { color: var(--green); border-color: var(--green-dim); }
+
   .leaderboard-table {
     width: 100%; border-collapse: collapse; margin-top: 1.5rem;
   }
@@ -1458,34 +1511,51 @@
       <div class="page-header">
         <div>
           <div class="page-title">Leaderboard</div>
-          <div class="page-sub">Top verifiers and grantees by activity</div>
+          <div class="page-sub">Top verifiers and grantees — ranked by on-chain activity</div>
         </div>
+        <button class="lb-refresh-btn" onclick="loadLeaderboard(true)" id="lb-refresh-btn">⟳ Refresh</button>
       </div>
 
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; flex-wrap:wrap">
+        <!-- VERIFIERS -->
         <div>
-          <div class="feed-title" style="margin-bottom:0.5rem">Top Verifiers</div>
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.5rem">
+            <div class="feed-title">Top Verifiers</div>
+            <span class="lb-source-badge" id="lb-verifier-source">loading…</span>
+          </div>
+          <div class="lb-controls">
+            <button class="lb-sort-btn active" id="vSort-approved" onclick="setVerifierSort('approved')">By Approvals</button>
+            <button class="lb-sort-btn" id="vSort-rejected" onclick="setVerifierSort('rejected')">By Reviews</button>
+          </div>
           <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden">
             <table class="leaderboard-table">
               <thead>
                 <tr>
-                  <th>#</th><th>Verifier</th><th>Approved</th><th>Reputation</th>
+                  <th>#</th><th>Verifier</th><th>Approved</th><th>Total Reviews</th>
                 </tr>
               </thead>
-              <tbody id="verifier-leaderboard"></tbody>
+              <tbody id="verifier-leaderboard"><tr><td colspan="4" class="lb-loading"><span class="spinner"></span> Loading from chain…</td></tr></tbody>
             </table>
           </div>
         </div>
+        <!-- GRANTEES -->
         <div>
-          <div class="feed-title" style="margin-bottom:0.5rem">Top Grantees</div>
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.5rem">
+            <div class="feed-title">Top Grantees</div>
+            <span class="lb-source-badge" id="lb-grantee-source">loading…</span>
+          </div>
+          <div class="lb-controls">
+            <button class="lb-sort-btn active" id="gSort-eth" onclick="setGranteeSort('eth')">By ETH Received</button>
+            <button class="lb-sort-btn" id="gSort-milestones" onclick="setGranteeSort('milestones')">By Milestones</button>
+          </div>
           <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden">
             <table class="leaderboard-table">
               <thead>
                 <tr>
-                  <th>#</th><th>Grantee</th><th>Earned</th><th>Milestones</th>
+                  <th>#</th><th>Grantee</th><th>ETH Received</th><th>Milestones</th>
                 </tr>
               </thead>
-              <tbody id="grantee-leaderboard"></tbody>
+              <tbody id="grantee-leaderboard"><tr><td colspan="4" class="lb-loading"><span class="spinner"></span> Loading from chain…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -1636,7 +1706,7 @@
 
     <div style="display:flex; gap:10px; margin-top:1.5rem">
       <button class="btn btn-ghost" style="flex:1" onclick="closeModal('create-modal')">Cancel</button>
-      <button class="btn btn-primary" style="flex:2" onclick="submitGrant()">
+      <button class="btn btn-primary" style="flex:2" id="create-grant-btn" onclick="submitGrant()">
         🔒 Lock Funds & Create Grant
       </button>
     </div>
@@ -2414,22 +2484,211 @@ function renderVerifier() {
 }
 
 function renderLeaderboard() {
+  // Trigger async load; show spinners while waiting
+  loadLeaderboard(false);
+}
+
+// ── Leaderboard sort state ─────────────────────────────────────────────────
+const lbState = {
+  verifierSort: 'approved',   // 'approved' | 'rejected'
+  granteeSort:  'eth',        // 'eth' | 'milestones'
+  verifiers: [],
+  grantees:  [],
+  fromChain: false,
+};
+
+function setVerifierSort(key) {
+  lbState.verifierSort = key;
+  document.querySelectorAll('[id^="vSort-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('vSort-' + key).classList.add('active');
+  renderVerifierTable();
+}
+
+function setGranteeSort(key) {
+  lbState.granteeSort = key;
+  document.querySelectorAll('[id^="gSort-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('gSort-' + key).classList.add('active');
+  renderGranteeTable();
+}
+
+function rankMedal(i) {
+  return i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1;
+}
+
+function renderVerifierTable() {
   const vEl = document.getElementById('verifier-leaderboard');
-  const gEl = document.getElementById('grantee-leaderboard');
-  if (vEl) vEl.innerHTML = verifierLeaders.map((v, i) => `
+  if (!vEl) return;
+  const key = lbState.verifierSort === 'approved' ? 'approved' : 'total';
+  const sorted = [...lbState.verifiers].sort((a, b) => b[key] - a[key]);
+  if (!sorted.length) {
+    vEl.innerHTML = '<tr><td colspan="4" class="lb-loading">No verifier activity found on-chain.</td></tr>';
+    return;
+  }
+  vEl.innerHTML = sorted.map((v, i) => `
     <tr>
-      <td><span class="rank-num ${i < 3 ? 'top' : ''}">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}</span></td>
-      <td><div class="user-cell"><div class="user-avatar">${v.handle.slice(0,2).toUpperCase()}</div>${v.handle}</div></td>
-      <td style="font-family:var(--mono)">${v.approved}</td>
-      <td><span style="color:var(--green); font-family:var(--mono)">${v.rep}</span></td>
+      <td><span class="rank-num ${i < 3 ? 'top' : ''}">${rankMedal(i)}</span></td>
+      <td><div class="user-cell"><div class="user-avatar">${v.addr.slice(2, 4).toUpperCase()}</div>
+        <span title="${v.addr}">${v.addr.slice(0,6)}…${v.addr.slice(-4)}</span></div></td>
+      <td style="font-family:var(--mono); color:var(--green)">${v.approved}</td>
+      <td style="font-family:var(--mono)">${v.total}</td>
     </tr>`).join('');
-  if (gEl) gEl.innerHTML = granteeLeaders.map((g, i) => `
+}
+
+function renderGranteeTable() {
+  const gEl = document.getElementById('grantee-leaderboard');
+  if (!gEl) return;
+  const key = lbState.granteeSort === 'eth' ? 'weiReceived' : 'milestones';
+  const sorted = [...lbState.grantees].sort((a, b) => {
+    if (key === 'weiReceived') return Number(b.weiReceived - a.weiReceived);
+    return b.milestones - a.milestones;
+  });
+  if (!sorted.length) {
+    gEl.innerHTML = '<tr><td colspan="4" class="lb-loading">No grantee activity found on-chain.</td></tr>';
+    return;
+  }
+  gEl.innerHTML = sorted.map((g, i) => `
     <tr>
-      <td><span class="rank-num ${i < 3 ? 'top' : ''}">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}</span></td>
-      <td><div class="user-cell"><div class="user-avatar">${g.handle.slice(0,2).toUpperCase()}</div>${g.handle}</div></td>
-      <td style="font-family:var(--mono); color:var(--green)">${g.earned}</td>
+      <td><span class="rank-num ${i < 3 ? 'top' : ''}">${rankMedal(i)}</span></td>
+      <td><div class="user-cell"><div class="user-avatar">${g.addr.slice(2, 4).toUpperCase()}</div>
+        <span title="${g.addr}">${g.addr.slice(0,6)}…${g.addr.slice(-4)}</span></div></td>
+      <td style="font-family:var(--mono); color:var(--green)">${formatEth(g.weiReceived)} ETH</td>
       <td style="font-family:var(--mono)">${g.milestones}</td>
     </tr>`).join('');
+}
+
+function formatEth(wei) {
+  // wei is a BigInt from ethers logs
+  try {
+    const e = Number(wei) / 1e18;
+    return e < 0.0001 ? '<0.0001' : e.toFixed(4);
+  } catch { return '—'; }
+}
+
+/**
+ * Load leaderboard data.
+ *  1. Try to query MilestonePaid and MilestoneApproved/Rejected events from the
+ *     deployed GrantStream contract via ethers.js (Base Sepolia).
+ *  2. If contract/ethers is unavailable, fall back to the hardcoded demo data.
+ */
+async function loadLeaderboard(forceRefresh) {
+  const vEl = document.getElementById('verifier-leaderboard');
+  const gEl = document.getElementById('grantee-leaderboard');
+  const vSrc = document.getElementById('lb-verifier-source');
+  const gSrc = document.getElementById('lb-grantee-source');
+  const refreshBtn = document.getElementById('lb-refresh-btn');
+
+  if (vEl) vEl.innerHTML = '<tr><td colspan="4" class="lb-loading"><span class="spinner"></span> Loading from chain…</td></tr>';
+  if (gEl) gEl.innerHTML = '<tr><td colspan="4" class="lb-loading"><span class="spinner"></span> Loading from chain…</td></tr>';
+  if (refreshBtn) { refreshBtn.disabled = true; refreshBtn.textContent = '⟳ Loading…'; }
+
+  const CONTRACT_ADDRESS = '0x0000000000000000000000000000000000000000'; // replace with deployed addr
+  const RPC_URL = 'https://base-sepolia-rpc.publicnode.com';
+
+  // Minimal ABI — only the events we need
+  const EVENTS_ABI = [
+    'event MilestonePaid(uint256 indexed grantId, uint256 indexed milestoneId, address indexed grantee, uint256 amount)',
+    'event MilestoneApproved(uint256 indexed grantId, uint256 indexed milestoneId)',
+    'event MilestoneRejected(uint256 indexed grantId, uint256 indexed milestoneId)',
+    'function grants(uint256) view returns (address funder, address grantee, address verifier, uint256 totalAmount, uint256 paidAmount, bool funded, bool exists)',
+  ];
+
+  let loadedFromChain = false;
+
+  try {
+    // Dynamically import ethers (CDN)
+    const ethers = await import('https://cdn.jsdelivr.net/npm/ethers@6/dist/ethers.min.js')
+      .catch(() => null);
+
+    if (ethers && CONTRACT_ADDRESS !== '0x0000000000000000000000000000000000000000') {
+      const provider = new ethers.JsonRpcProvider(RPC_URL);
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, EVENTS_ABI, provider);
+
+      // Query last ~10 000 blocks to keep request light
+      const latest = await provider.getBlockNumber();
+      const fromBlock = Math.max(0, latest - 10000);
+
+      // Fetch all three event types in parallel
+      const [paidLogs, approvedLogs, rejectedLogs] = await Promise.all([
+        contract.queryFilter(contract.filters.MilestonePaid(), fromBlock, latest),
+        contract.queryFilter(contract.filters.MilestoneApproved(), fromBlock, latest),
+        contract.queryFilter(contract.filters.MilestoneRejected(), fromBlock, latest),
+      ]);
+
+      // ── Build grantee map (keyed by grantee address) ────────────────────
+      const granteeMap = {};
+      for (const log of paidLogs) {
+        const addr = log.args.grantee.toLowerCase();
+        if (!granteeMap[addr]) granteeMap[addr] = { addr: log.args.grantee, milestones: 0, weiReceived: 0n };
+        granteeMap[addr].milestones += 1;
+        granteeMap[addr].weiReceived += log.args.amount;
+      }
+
+      // ── Build verifier map: look up verifier for each approval/rejection ─
+      // We derive verifier from grant.verifier field for each unique grantId seen
+      const verifierMap = {};
+      const grantIds = new Set([
+        ...approvedLogs.map(l => l.args.grantId.toString()),
+        ...rejectedLogs.map(l => l.args.grantId.toString()),
+      ]);
+
+      // Batch-fetch grant data (parallel)
+      const grantDataMap = {};
+      await Promise.all([...grantIds].map(async gid => {
+        try {
+          const g = await contract.grants(gid);
+          grantDataMap[gid] = g.verifier.toLowerCase();
+        } catch { /* skip */ }
+      }));
+
+      for (const log of approvedLogs) {
+        const gid = log.args.grantId.toString();
+        const vAddr = grantDataMap[gid];
+        if (!vAddr) continue;
+        if (!verifierMap[vAddr]) verifierMap[vAddr] = { addr: vAddr, approved: 0, total: 0 };
+        verifierMap[vAddr].approved += 1;
+        verifierMap[vAddr].total    += 1;
+      }
+      for (const log of rejectedLogs) {
+        const gid = log.args.grantId.toString();
+        const vAddr = grantDataMap[gid];
+        if (!vAddr) continue;
+        if (!verifierMap[vAddr]) verifierMap[vAddr] = { addr: vAddr, approved: 0, total: 0 };
+        verifierMap[vAddr].total += 1;
+      }
+
+      lbState.verifiers  = Object.values(verifierMap);
+      lbState.grantees   = Object.values(granteeMap);
+      lbState.fromChain  = true;
+      loadedFromChain    = true;
+    }
+  } catch (err) {
+    console.warn('Leaderboard chain fetch failed, using demo data:', err);
+  }
+
+  // ── Fallback to demo data ────────────────────────────────────────────────
+  if (!loadedFromChain) {
+    lbState.verifiers = verifierLeaders.map(v => ({
+      addr: v.addr,
+      approved: v.approved,
+      total: v.approved + Math.floor(v.approved * 0.15),
+    }));
+    lbState.grantees = granteeLeaders.map(g => ({
+      addr: g.addr,
+      milestones: g.milestones,
+      weiReceived: BigInt(Math.round(parseFloat(g.earned.replace(/[$,]/g, '')) * 4e14)),
+    }));
+    lbState.fromChain = false;
+  }
+
+  // Update source badges
+  const srcClass = lbState.fromChain ? 'lb-source-badge live' : 'lb-source-badge';
+  const srcText  = lbState.fromChain ? '⬤ Live (Base Sepolia)' : '◎ Demo data';
+  if (vSrc) { vSrc.className = srcClass; vSrc.textContent = srcText; }
+  if (gSrc) { gSrc.className = srcClass; gSrc.textContent = srcText; }
+  if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.textContent = '⟳ Refresh'; }
+
+  renderVerifierTable();
+  renderGranteeTable();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2446,7 +2705,7 @@ function updateMilestoneInputs() {
     </div>`).join('');
 }
 
-function submitGrant() {
+async function submitGrant() {
   if (!hasWalletConnection()) {
     toast('Connect your wallet before creating a grant.', 'error');
     closeModal('create-modal');
@@ -2454,50 +2713,165 @@ function submitGrant() {
     return;
   }
 
-  const title  = document.getElementById('grant-title').value || 'New Grant';
-  const amount = parseInt(document.getElementById('grant-amount').value) || 1000;
-  const newGrant = {
-    id: 'g' + Date.now(), title,
-    recipient: document.getElementById('grant-recipient').value || '0xNew...Addr',
-    verifier:  document.getElementById('grant-verifier').value  || '0xVer...ifier',
-    amount, distributed: 0, status: 'active',
-    milestones: Array.from({ length: 3 }, (_, i) => ({
-      title: `Milestone ${i + 1}`, amount: Math.floor(amount / 3), status: i === 0 ? 'pending' : 'locked'
-    })),
-    deadline: '2025-09-01', created: 'just now'
-  };
-  grants.unshift(newGrant);
-  feedEvents.unshift({ type: 'created', text: `<strong>New grant created</strong> — ${title} (${amount} USDC)`, time: 'just now' });
-  closeModal('create-modal');
-  renderGrants('grants-list', grants);
-  renderFeed();
-  toast('Grant created! Funds locked in escrow.', 'success');
-  document.getElementById('grant-title').value  = '';
-  document.getElementById('grant-amount').value = '';
+  const btn = document.getElementById('create-grant-btn');
+  const idleHtml = '🔒 Lock Funds & Create Grant';
+  setBtnLoading(btn, true, idleHtml);
+
+  const title     = document.getElementById('grant-title').value.trim() || 'New Grant';
+  const amount    = parseInt(document.getElementById('grant-amount').value) || 1000;
+  const recipient = document.getElementById('grant-recipient').value.trim() || '0xNew...Addr';
+  const verifier  = document.getElementById('grant-verifier').value.trim()  || '0xVer...ifier';
+
+  // Collect milestone amounts from inputs
+  const milestoneRows = document.querySelectorAll('#milestone-inputs .milestone-input-row');
+  const milestoneAmounts = [];
+  milestoneRows.forEach(row => {
+    const amtInput = row.querySelector('input[type="number"]');
+    milestoneAmounts.push(parseInt(amtInput?.value) || Math.floor(amount / milestoneRows.length));
+  });
+
+  try {
+    // ── Real on-chain path ─────────────────────────────────────────────────
+    // const signer = await getSigner();
+    // const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, signer);
+    // const escrow = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+    // const total = milestoneAmounts.reduce((a, b) => a + b, 0);
+    // const approveTx = await usdcContract.approve(CONTRACT_ADDRESS, total * 1e6);
+    // await approveTx.wait();
+    // const tx = await escrow.createGrant(recipient, verifier, milestoneAmounts.map(a => a * 1e6));
+    // const receipt = await tx.wait();
+    // const grantId = receipt.logs[0].args.grantId.toString();
+    // ── Simulated tx (demo) ────────────────────────────────────────────────
+    await new Promise(r => setTimeout(r, 1600));
+
+    const newGrant = {
+      id: 'g' + Date.now(), title, recipient, verifier,
+      amount, distributed: 0, status: 'active',
+      milestones: milestoneAmounts.map((a, i) => ({
+        title: `Milestone ${i + 1}`, amount: a, status: i === 0 ? 'pending' : 'locked'
+      })),
+      deadline: '2025-09-01', created: 'just now'
+    };
+    grants.unshift(newGrant);
+    feedEvents.unshift({
+      type: 'created',
+      text: `<strong>New grant created</strong> — ${title} (${amount} USDC)`,
+      time: 'just now'
+    });
+
+    closeModal('create-modal');
+    renderGrants('grants-list', grants);
+    renderFeed();
+    toast(`Grant created! $${amount.toLocaleString()} USDC locked in escrow.`, 'success');
+    document.getElementById('grant-title').value    = '';
+    document.getElementById('grant-amount').value   = '';
+    document.getElementById('grant-recipient').value = '';
+    document.getElementById('grant-verifier').value  = '';
+
+  } catch (err) {
+    console.error('createGrant failed:', err);
+    toast('Grant creation failed: ' + (err.shortMessage || err.message || 'Transaction reverted'), 'error');
+  } finally {
+    setBtnLoading(btn, false, idleHtml);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // VERIFIER ACTIONS
 // ═══════════════════════════════════════════════════════════════════════════
-function approveSubmission(id, btn) {
-  const card = btn.closest('.submission-card');
-  card.style.opacity = '0.5';
-  setTimeout(() => {
-    card.style.border   = '1px solid var(--green-dim)';
-    card.style.opacity  = '1';
-    card.querySelector('.action-row').innerHTML =
-      '<span style="color:var(--green); font-size:0.85rem">✓ Approved — funds released</span>';
-    toast('Milestone approved! USDC released to grantee.', 'success');
-    feedEvents.unshift({ type: 'approved', text: '<strong>Milestone approved</strong> — funds released to grantee', time: 'just now' });
-    renderFeed();
-  }, 600);
+// ═══════════════════════════════════════════════════════════════════════════
+// VERIFIER ACTIONS  —  spinner, disabled state, on-chain tx, toast on confirm
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Shared helper: set a button into loading/idle state */
+function setBtnLoading(btn, loading, idleHtml) {
+  btn.disabled = loading;
+  btn.innerHTML = loading
+    ? `<span class="spinner"></span> Pending…`
+    : idleHtml;
 }
 
-function rejectSubmission(id, btn) {
-  const card = btn.closest('.submission-card');
-  card.querySelector('.action-row').innerHTML =
-    '<span style="color:#f87171; font-size:0.85rem">✗ Rejected — grantee can resubmit with updated evidence</span>';
-  toast('Milestone rejected. Grantee can resubmit.', 'success');
+async function approveSubmission(id, btn) {
+  if (!hasWalletConnection()) {
+    toast('Connect your wallet to approve milestones.', 'error');
+    openWalletModal();
+    return;
+  }
+
+  const s = submissions.find(x => x.id === id);
+  const idleHtml = `✓ Approve & Release $${s ? s.amount : ''}`;
+  setBtnLoading(btn, true, idleHtml);
+
+  // Also disable the sibling reject button
+  const rejectBtn = btn.closest('.action-row').querySelector('.btn-reject');
+  if (rejectBtn) rejectBtn.disabled = true;
+
+  try {
+    // ── Real on-chain path (when CONTRACT_ADDRESS is set) ──────────────────
+    // const signer = await getSigner();
+    // const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+    // const tx = await contract.approveMilestone(s.onChainGrantId, s.onChainMilestoneId);
+    // const receipt = await tx.wait();
+    // ── Simulated tx (demo) ────────────────────────────────────────────────
+    await new Promise(r => setTimeout(r, 1500));
+
+    // Update DOM on success
+    const card = btn.closest('.submission-card');
+    card.style.border = '1px solid var(--green-dim)';
+    card.querySelector('.action-row').innerHTML =
+      '<span style="color:var(--green); font-size:0.85rem">✓ Approved — funds released to grantee</span>';
+
+    // Update local feed
+    feedEvents.unshift({
+      type: 'approved',
+      text: `<strong>Milestone approved</strong> — funds released to grantee`,
+      time: 'just now'
+    });
+    if (document.getElementById('page-dashboard').classList.contains('active')) renderFeed();
+
+    toast('Milestone approved! USDC released to grantee.', 'success');
+
+  } catch (err) {
+    console.error('approveMilestone failed:', err);
+    toast('Approval failed: ' + (err.shortMessage || err.message || 'Transaction reverted'), 'error');
+    setBtnLoading(btn, false, idleHtml);
+    if (rejectBtn) rejectBtn.disabled = false;
+  }
+}
+
+async function rejectSubmission(id, btn) {
+  if (!hasWalletConnection()) {
+    toast('Connect your wallet to reject milestones.', 'error');
+    openWalletModal();
+    return;
+  }
+
+  const idleHtml = '✗ Reject';
+  setBtnLoading(btn, true, idleHtml);
+
+  const approveBtn = btn.closest('.action-row').querySelector('.btn-approve');
+  if (approveBtn) approveBtn.disabled = true;
+
+  try {
+    // ── Real on-chain path ─────────────────────────────────────────────────
+    // const signer = await getSigner();
+    // const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+    // const tx = await contract.rejectMilestone(s.onChainGrantId, s.onChainMilestoneId);
+    // await tx.wait();
+    // ── Simulated tx (demo) ────────────────────────────────────────────────
+    await new Promise(r => setTimeout(r, 1200));
+
+    btn.closest('.action-row').innerHTML =
+      '<span style="color:#f87171; font-size:0.85rem">✗ Rejected — grantee can resubmit with updated evidence</span>';
+
+    toast('Milestone rejected. Grantee notified.', 'error');
+
+  } catch (err) {
+    console.error('rejectMilestone failed:', err);
+    toast('Rejection failed: ' + (err.shortMessage || err.message || 'Transaction reverted'), 'error');
+    setBtnLoading(btn, false, idleHtml);
+    if (approveBtn) approveBtn.disabled = false;
+  }
 }
 
 function showGrantDetail(id) {
@@ -2648,6 +3022,7 @@ Object.assign(window, {
   switchIpfsTab, handleDragOver, handleDragLeave, handleDrop,
   handleFileSelect, clearFile, uploadToIPFS, copyCid,
   onLinkInput, validateLink,
+  loadLeaderboard, setVerifierSort, setGranteeSort,
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
